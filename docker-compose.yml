@@ -1,0 +1,155 @@
+version: "2.0"
+
+services:
+  mongodb:
+    container_name: mongodb
+    image: mongo
+    volumes:
+      - "./mongo/data:/data/db"
+    # env_file:
+    #   - './mongo/mongo.env'
+    # ports:
+    #   - "27017:27017"
+    expose: 
+      - "27017"
+
+  api:
+    container_name: api
+    image: api
+    build: ./api
+    restart: always
+    # ports:
+      # - "8000:8000"
+    volumes:
+      - "./api/src:/usr/share/workdir/api/src"
+    command: bash -c "npm run app"
+    depends_on:
+      - "mongodb"
+      - "sawtooth-client"
+
+  sawtooth-eventhandle:
+    container_name: sawtooth-eventhandle
+    image: sawtooth-eventhandle
+    build: ./eventHandle
+    # ports:
+    #   - "9001:9000"
+    volumes:
+      - "./eventHandle/src/:/usr/share/workdir/eventHandle/src"
+    command: bash -c "npm run app"
+    depends_on:
+      - "sawtooth-rest-api"
+      - "settings-tp"
+      - "validator"
+
+  ehr-TP:
+    container_name: ehr-tp
+    image: ehr-tp
+    build: ./Blockchain/processor
+    # ports:
+    #   - "9000:9000"
+    volumes:
+      - "./Blockchain/processor/src:/usr/share/workdir/TP/src"
+    command: bash -c "npm run start"
+    depends_on:
+      - "sawtooth-rest-api"
+      - "settings-tp"
+      - "validator"
+
+  sawtooth-client:
+    container_name: sawtooth-client
+    image: sawtooth-client
+    build: ./Blockchain/client
+    # ports:
+    #   - "3000:3000"
+    volumes:
+      - "./Blockchain/client/src:/usr/share/workdir/client/src"
+    command: bash -c "node src/app.js"
+    depends_on:
+      - "validator"
+      - "ehr-queue"
+      - "ehr-TP"
+
+  ehr-queue:
+    container_name: ehr-queue
+    image: "rabbitmq:3.7.17-alpine"
+    hostname: ehrQueue
+    volumes:
+      - "./ehrQueue/data/database:/var/lib/rabbitmq/mnesia/rabbit@ehrQueue"
+    # ports:
+    #   - "5672:5672"
+    expose: 
+      - "5672"
+
+  ehrqconsumer:
+    container_name: ehrqconsumer
+    image: ehrqconsumer
+    build: ./Blockchain/ehrQConsumer
+    restart: always
+    volumes: 
+      - "./Blockchain/ehrQConsumer/src:/usr/share/workdir/ehrQConsumer/src"
+      - "/etc/localtime:/etc/localtime:ro"
+    command: node src/app.js
+    depends_on: 
+      - "ehr-queue"
+      - "validator"
+
+  nginx-reverse-proxy:
+    container_name: nginx-reverse-proxy
+    image: nginx-reverse-proxy
+    build: ./nginx
+    restart: always
+    volumes: 
+      - './nginx/config/nginx.conf:/etc/nginx/nginx.conf'
+      - './nginx/config/proxy.conf:/etc/nginx/conf.d/proxy.conf'
+      - './nginx/config/test.conf:/etc/nginx/conf.d/test.conf'
+      - './nginx/src:/data/workdir/static'
+    ports: 
+      - "8009:80"
+    depends_on: 
+      - "api"
+
+  #---------------------------------------------------------------------------------------------------------
+
+  sawtooth-rest-api:
+    container_name: rest-api
+    image: hyperledger/sawtooth-rest-api:1.0
+    expose:
+      - "8008"
+    depends_on:
+      - validator
+    entrypoint: |
+      sawtooth-rest-api -vvv
+        --connect tcp://validator:4004
+        --bind sawtooth-rest-api:8008
+
+  settings-tp:
+    container_name: settings
+    image: hyperledger/sawtooth-settings-tp:1.0
+    depends_on:
+      - validator
+    command: settings-tp -vv --connect tcp://validator:4004
+
+  validator:
+    container_name: validator
+    image: hyperledger/sawtooth-validator:1.0
+    expose:
+      - "4004"
+    volumes: 
+      - "./Blockchain/validator/data:/var/lib/sawtooth/"
+      - "./Blockchain/validator/userKey:/root/.sawtooth/keys/"
+      - "./Blockchain/validator/validatorKey:/etc/sawtooth/keys/"
+      - "./Blockchain/validator/policy:/etc/sawtooth/policy/"
+    command: |
+      bash -c "
+        if [ ! -f /etc/sawtooth/keys/validator.priv ]; then
+        sawadm keygen &&
+        sawtooth keygen my_key &&
+        sawset genesis -k /root/.sawtooth/keys/my_key.priv &&
+        sawadm genesis config-genesis.batch
+        fi;
+        sawtooth-validator -vvv \
+          --endpoint tcp://validator:8800 \
+          --bind component:tcp://eth0:4004 \
+          --bind network:tcp://eth0:8800
+      "
+    

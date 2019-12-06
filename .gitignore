@@ -1,0 +1,9 @@
+node_modules
+.env
+d
+mongo/data/*
+ehrQueue/data/*
+Blockchain/ehrQConsumer/src/log/*
+package-lock.json
+api/src/log/log
+Blockchain/validator/*

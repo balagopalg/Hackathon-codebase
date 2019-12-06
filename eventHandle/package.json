@@ -1,0 +1,16 @@
+{
+  "name": "eventhandle",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "app": "node src/app.js"
+  },
+  "author": "abhiramTS",
+  "license": "ISC",
+  "dependencies": {
+    "lodash": "^4.17.15",
+    "sawtooth-sdk": "^1.0.5",
+    "socket.io": "^2.2.0"
+  }
+}
