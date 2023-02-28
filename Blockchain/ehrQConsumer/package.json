@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "amqplib": "^0.5.5",
+    "amqplib": "^0.10.3",
     "node-fetch": "^2.6.0",
     "sawtooth-sdk": "^1.0.5",
     "socket.io-client": "^2.2.0",
