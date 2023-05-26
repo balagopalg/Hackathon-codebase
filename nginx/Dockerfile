@@ -1,5 +1,5 @@
 
-FROM nginx:stable-alpine
+FROM nginx:mainline-alpine
 
 RUN mkdir -p /data/workdir/static
 
